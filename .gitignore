@@ -1,0 +1,24 @@
+# Build output
+Debug/
+Release/
+build/
+
+# CubeIDE settings (optional — some people include these)
+.settings/
+.cproject
+.project
+
+# CubeMX backup files
+*.bak
+
+# Object files
+*.o
+*.d
+*.elf
+*.bin
+*.hex
+*.map
+*.lst
+
+# IDE metadata
+.metadata/
