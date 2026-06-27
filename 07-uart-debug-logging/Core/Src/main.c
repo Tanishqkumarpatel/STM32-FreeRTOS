@@ -37,45 +37,48 @@
 
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
-
+#define LOG_INFO(msg)  log_msg("INFO", msg)
+#define LOG_WARN(msg)  log_msg("WARN", msg)
+#define LOG_ERROR(msg) log_msg("ERROR", msg)
+#define LOG_DEBUG(msg) log_msg("DEBUG", msg)
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
 UART_HandleTypeDef huart2;
 
 /* Definitions for defaultTask */
-//osThreadId_t defaultTaskHandle;
-//const osThreadAttr_t defaultTask_attributes = {
-//  .name = "defaultTask",
-//  .stack_size = 128 * 4,
-//  .priority = (osPriority_t) osPriorityNormal,
-//};
+osThreadId_t defaultTaskHandle;
+const osThreadAttr_t defaultTask_attributes = {
+  .name = "defaultTask",
+  .stack_size = 128 * 4,
+  .priority = (osPriority_t) osPriorityNormal,
+};
 /* USER CODE BEGIN PV */
-
 osMutexId_t uartMutex;
-osSemaphoreId_t uartSem;
 
-osThreadId_t lowPriorityTaskHandle;
-osThreadId_t midPriorityTaskHandle;
-osThreadId_t highPriorityTaskHandle;
+osThreadId_t Task1;
+osThreadId_t Task2;
+osThreadId_t Task3;
 
-const osThreadAttr_t lowPriorityTask_attributes = {
-		.name = "lowPriorityTask",
-		.stack_size = 128*4,
-		.priority = (osPriority_t) osPriorityBelowNormal,
+const osThreadAttr_t Task1_attributes = {
+  .name = "Task1",
+  .stack_size = 128 * 4,
+  .priority = (osPriority_t) osPriorityNormal,
 };
 
-const osThreadAttr_t midPriorityTask_attributes = {
-		.name = "midPriorityTask",
-		.stack_size = 128*4,
-		.priority = (osPriority_t) osPriorityNormal,
+const osThreadAttr_t Task2_attributes = {
+  .name = "Task2",
+  .stack_size = 128 * 4,
+  .priority = (osPriority_t) osPriorityNormal,
 };
 
-const osThreadAttr_t highPriorityTask_attributes = {
-		.name = "highPriorityTask",
-		.stack_size = 128*4,
-		.priority = (osPriority_t) osPriorityHigh,
+
+const osThreadAttr_t Task3_attributes = {
+  .name = "Task3",
+  .stack_size = 128 * 4,
+  .priority = (osPriority_t) osPriorityNormal,
 };
+
 
 /* USER CODE END PV */
 
@@ -83,12 +86,13 @@ const osThreadAttr_t highPriorityTask_attributes = {
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART2_UART_Init(void);
-//void StartDefaultTask(void *argument);
+void StartDefaultTask(void *argument);
 
 /* USER CODE BEGIN PFP */
-void StartLowPriorityTask(void *argument);
-void StartMidPriorityTask(void *argument);
-void StartHighPriorityTask(void *argument);
+void log_msg(const char* type, const char* msg);
+void StartTask1(void *argument);
+void StartTask2(void *argument);
+void StartTask3(void *argument);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -145,7 +149,6 @@ int main(void)
 
   /* USER CODE BEGIN RTOS_SEMAPHORES */
   /* add semaphores, ... */
-  uartSem = osSemaphoreNew(1, 1, NULL);
   /* USER CODE END RTOS_SEMAPHORES */
 
   /* USER CODE BEGIN RTOS_TIMERS */
@@ -158,15 +161,13 @@ int main(void)
 
   /* Create the thread(s) */
   /* creation of defaultTask */
-//  defaultTaskHandle = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
+  defaultTaskHandle = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
-  lowPriorityTaskHandle = osThreadNew(StartLowPriorityTask, NULL, &lowPriorityTask_attributes);
-
-  midPriorityTaskHandle = osThreadNew(StartMidPriorityTask, NULL, &midPriorityTask_attributes);
-
-  highPriorityTaskHandle = osThreadNew(StartHighPriorityTask, NULL, &highPriorityTask_attributes);
+  Task1 = osThreadNew(StartTask1, NULL, &Task1_attributes);
+  Task2 = osThreadNew(StartTask2, NULL, &Task2_attributes);
+  Task3 = osThreadNew(StartTask3, NULL, &Task3_attributes);
   /* USER CODE END RTOS_THREADS */
 
   /* USER CODE BEGIN RTOS_EVENTS */
@@ -323,40 +324,44 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
-void StartLowPriorityTask(void *argument) {
-	for (;;) {
-//		osMutexAcquire(uartMutex, osWaitForever);
-		osSemaphoreAcquire(uartSem, osWaitForever);
-//		printf("LOW: acquired mutex\r\n");
-		printf("LOW: acquired Sem\r\n");
-		for(volatile uint32_t i = 0; i < 1000000; i++);
-//		printf("LOW: releasing mutex\r\n");
-        printf("LOW: releasing Sem\r\n");
-//		osMutexRelease(uartMutex);
-		osSemaphoreRelease(uartSem);
-	}
+void log_msg(const char* type, const char* msg) {
+	osMutexAcquire(uartMutex, osWaitForever);
+	const char* name  = osThreadGetName(osThreadGetId());
+	int32_t priority = (int32_t)osThreadGetPriority(osThreadGetId());
+	uint32_t time = HAL_GetTick();
+	printf("[%ld ms] [%s] [%ld] [%s] [%s]\r\n", time, name, priority, type, msg);
+	osMutexRelease(uartMutex);
 }
 
-void StartMidPriorityTask(void *argument) {
-	for (;;) {
-		HAL_GPIO_TogglePin(LD3_GPIO_Port, LD3_Pin);
-		osDelay(1);
-	}
+void StartTask1(void *argument) {
+    uint32_t count = 0;
+    for (;;) {
+        LOG_INFO("running");
+        count++;
+        if (count % 5 == 0) {
+            LOG_WARN("count reached multiple of 5");
+        }
+        osDelay(500);
+    }
 }
 
-void StartHighPriorityTask(void *argument) {
-	for (;;) {
-//		printf("HIGH: waiting for mutex\r\n");
+void StartTask2(void *argument) {
+    for (;;) {
+        LOG_DEBUG("heart-beat");
+        osDelay(1000);
+    }
+}
 
-		printf("HIGH: waiting for Sem\r\n");
-//		osMutexAcquire(uartMutex, osWaitForever);
-		osSemaphoreAcquire(uartSem, osWaitForever);
-//		printf("HIGH: acquired mutex\r\n");
-		printf("HIGH: acquired Sem\r\n");
-//		osMutexRelease(uartMutex);
-		osSemaphoreRelease(uartSem);
-		osDelay(500);
-	}
+void StartTask3(void *argument) {
+    uint32_t errorCount = 0;
+    for (;;) {
+        errorCount++;
+        if (errorCount >= 3) {
+            LOG_ERROR("error threshold reached");
+            errorCount = 0;
+        }
+        osDelay(750);
+    }
 }
 /* USER CODE END 4 */
 
@@ -367,16 +372,28 @@ void StartHighPriorityTask(void *argument) {
   * @retval None
   */
 /* USER CODE END Header_StartDefaultTask */
-//void StartDefaultTask(void *argument)
-//{
+void StartDefaultTask(void *argument)
+{
   /* USER CODE BEGIN 5 */
+	uint32_t count = 0;
   /* Infinite loop */
-//  for(;;)
-//  {
-//	  osDelay(1);
-//  }
+  for(;;)
+  {
+	  count++;
+	  if (count % 3 == 0) {
+		  LOG_INFO("Divisible by 3");
+	  } else if (count % 10 == 0) {
+		  LOG_DEBUG("It must be divisible by 5 and 10");
+	  } else if (count % 7 == 0) {
+		  LOG_WARN("7 wonders");
+	  } else if (count % 13 == 0) {
+		  LOG_ERROR("Critical failure!");
+	  } else {
+		  osDelay(5000);
+	  }
+  }
   /* USER CODE END 5 */
-//}
+}
 
 /**
   * @brief  Period elapsed callback in non blocking mode
